@@ -1,0 +1,105 @@
+plugins {
+    id "java"
+    id 'eclipse'
+    id 'idea'
+}
+
+configurations {
+    cupGeneration
+    jflexGeneration
+}
+
+repositories {
+    jcenter()
+    mavenCentral()
+}
+
+dependencies {
+    jflexGeneration 'de.jflex:jflex:1.8.2'
+    cupGeneration 'com.github.vbmacher:java-cup:11b-20160615-1'
+    compile 'com.github.vbmacher:java-cup-runtime:11b-20160615-1'
+}
+
+task jflex {
+    ext.source = fileTree ( 'src/main/jflex'){
+        include "**/*.jflex"
+        include "**/*.flex"
+    }
+    ext.destdir = file("src/main/generated-jflex")
+    ext.noback = 'true'
+    ext.verbose = 'on'
+    ant.taskdef(name:'jflex', classpath:configurations.jflexGeneration.asPath,  classname:"jflex.anttask.JFlexTask")
+    doLast {
+        sourceSets.main.java.srcDir jflex.destdir
+        source.each { File f -> 
+            println "jflex source --> ${f}"
+            ant.jflex(file:f, destdir:destdir, nobak:noback, verbose:verbose)
+        }
+    }
+}
+
+task cup {
+	ext.source = fileTree ('src/main/cup'){
+		include "**/*.cup"
+	}	
+	ext.destdir = file("src/main/generated-cup")
+    ext.force = 'true'
+    ext.dump = 'off'
+    ext.locations = 'false'
+	ant.taskdef(name:'cup', classpath:configurations.cupGeneration.asPath,  classname:"java_cup.anttask.CUPTask")
+	doLast {
+		sourceSets.main.java.srcDir cup.destdir
+		source.each { File f -> 
+			println "cup source --> ${f}"
+			ant.cup(srcfile:f, destdir:destdir, force:force, dump:dump, locations:locations)
+		}
+	}
+}
+
+clean.doFirst {
+    delete jflex.destdir
+    delete cup.destdir		
+}
+
+compileJava.dependsOn cup, jflex
+
+jar {
+    from {
+        configurations.compile.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+    manifest {
+        attributes  'Main-Class': 'fr.harisclement.tp1.Main'
+    }
+}
+
+task ide {
+    eclipseClasspath.dependsOn ide
+    ideaModule.dependsOn ide
+    doFirst {
+        mkdir jflex.destdir
+        mkdir cup.destdir
+    }
+}
+
+eclipse.classpath.defaultOutputDir = sourceSets.main.output.classesDir
+idea {
+    module {
+        generatedSourceDirs += cup.destdir
+        generatedSourceDirs += jflex.destdir
+        inheritOutputDirs = false
+        outputDir = sourceSets.main.output.classesDir
+        testOutputDir = sourceSets.test.output.classesDir
+    }
+}
+
+sourceSets {
+    main {
+        output.classesDir = file('build/classes/main/')
+        java {
+            srcDir cup.destdir
+            srcDir jflex.destdir
+        }
+    }
+}

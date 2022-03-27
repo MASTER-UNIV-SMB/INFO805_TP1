@@ -1,0 +1,57 @@
+package fr.harisclement.tp1;
+
+import java_cup.runtime.Symbol;
+
+action code {:
+	private boolean erreur = false;
+:};
+
+ 
+parser code {:
+  public void report_error(String message, Object info) {
+ 	String m = "";
+ 	if (info instanceof java_cup.runtime.Symbol) {
+ 	    Symbol s = ((Symbol) info); 	
+ 		if (s != null && s.left >= 0 ) {
+ 			m =  "Ligne " + (s.left+1) + ", Colonne " + (s.right+1) + " : ";
+ 			}
+ 		}
+ 	m = m + message;
+    System.err.println(m);
+    }
+:};
+
+ init with {:
+:};
+
+terminal PLUS, MOINS, MOINS_UNAIRE, MUL, DIV, MOD, PAR_G, PAR_D, SEMI, ERROR; 
+terminal Integer ENTIER;
+
+non terminal liste_expr, expr;
+non terminal Integer expression ;
+
+precedence left PLUS, MOINS;
+precedence left MUL, DIV, MOD;
+precedence left MOINS_UNAIRE;
+
+
+liste_expr	::= expr liste_expr 
+			  | expr  
+			  ;
+
+expr 		::= expression:e SEMI:pv   {: if (! erreur) System.out.println("Ligne "+(pvleft+1)+", Colonne "+(pvright+1)+" : Eval = "+e); erreur = false; :}
+			  | error SEMI			   {: erreur = false; :}
+			  ;
+expression 	::= ENTIER:e                            {: RESULT = e ; :}
+			  | expression:e1 PLUS expression:e2    {: RESULT = e1+e2 ; :}
+			  | expression:e1 MOINS expression:e2   {: RESULT = e1-e2 ; :}
+			  | MOINS expression:e   				{: RESULT = -e ; :} 	%prec MOINS_UNAIRE
+			  | expression:e1 MUL expression:e2     {: RESULT = e1*e2 ; :}
+			  | expression:e1 DIV expression:e2     {: if (erreur) { RESULT= 0; } 
+													   else if (e2 == 0) { RESULT = 0; erreur=true; System.err.println("Ligne "+(e2left+1)+", Colonne "+(e2right+1)+" : Erreur division par zero"); } 
+													   else { RESULT = e1/e2; } :}
+			  | expression:e1 MOD expression:e2     {: if (erreur) { RESULT= 0; } 
+													   else if (e2 == 0) { RESULT = 0; erreur=true; System.err.println("Ligne "+(e2left+1)+", Colonne "+(e2right+1)+" : Erreur division par zero"); }
+													   else { RESULT = e1%e2; } :}
+			  | PAR_G expression:e PAR_D            {: RESULT = e ; :}
+			  ;
